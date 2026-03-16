@@ -1,9 +1,12 @@
 services:
   app:
-    build: .
+    image: ghcr.io/andmbg/isochrones-berlin:latest
     ports:
       - "8080:8080"
     volumes:
-      - .:/app
+      - cache-data:/app/data
     environment:
-      - DEBUG=true
+      - DEBUG=false
+
+volumes:
+  cache-data:
