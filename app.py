@@ -77,8 +77,8 @@ app.layout = dmc.MantineProvider(
             p="md",
             style={
                 "position": "fixed",
-                "top": 16,
-                "left": 16,
+                "top": 10,
+                "left": 50,
                 "zIndex": 1000,
                 "minWidth": 300,
             },
