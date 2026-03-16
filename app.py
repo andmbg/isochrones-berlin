@@ -4,6 +4,7 @@ import dash_leaflet as dl
 from dash import Dash, Input, Output, callback, dcc, html, no_update
 import dash_mantine_components as dmc
 import matplotlib.cm as cm
+import requests
 
 from src.bvg import fetch_reachable_stops, nearest_stop
 from src import cache
@@ -85,6 +86,15 @@ app.layout = dmc.MantineProvider(
         dcc.Store(id="stations-store"),
         dcc.Store(id="pending-30"),
         dcc.Store(id="pending-60"),
+        dcc.Store(id="api-error"),
+        dmc.Modal(
+            id="error-modal",
+            title="API Error",
+            children=dmc.Text(
+                "The BVG API returned a server error (500). Please try again later.",
+                size="sm",
+            ),
+        ),
     ],
 )
 
@@ -94,29 +104,41 @@ _HIDE = {"display": "none"}
 
 
 @callback(
+    Output("error-modal", "opened"),
+    Input("api-error", "data"),
+)
+def show_error_modal(error):
+    return bool(error)
+
+
+@callback(
     Output("click-coords", "children"),
     Output("click-address", "children"),
     Output("stations-store", "data"),
     Output("pending-30", "data"),
     Output("loading-text", "children"),
     Output("spinner", "style"),
+    Output("api-error", "data"),
     Input("map", "clickData"),
 )
 def on_map_click(click_data):
     if not click_data:
-        return "Klicke auf die Karte, um Koordinaten zu sehen.", "", None, None, "", _HIDE
+        return "Klicke auf die Karte, um Koordinaten zu sehen.", "", None, None, "", _HIDE, None
     lat = click_data["latlng"]["lat"]
     lng = click_data["latlng"]["lng"]
-    stop = nearest_stop(lat, lng)
+    try:
+        stop = nearest_stop(lat, lng)
+    except requests.exceptions.HTTPError:
+        return no_update, no_update, no_update, no_update, "", _HIDE, True
     coords = f"Lat: {stop['lat']:.5f}  |  Lng: {stop['lng']:.5f}"
     origin = {**stop, "duration": 0, "origin": True}
 
     cached = cache.get(stop["id"])
     if cached is not None:
-        return coords, stop["name"], [origin, *cached], None, "", _HIDE
+        return coords, stop["name"], [origin, *cached], None, "", _HIDE, None
 
     stops_15 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=15)
-    return coords, stop["name"], [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW
+    return coords, stop["name"], [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW, None
 
 
 @callback(
@@ -124,31 +146,39 @@ def on_map_click(click_data):
     Output("pending-60", "data"),
     Output("loading-text", "children", allow_duplicate=True),
     Output("spinner", "style", allow_duplicate=True),
+    Output("api-error", "data", allow_duplicate=True),
     Input("pending-30", "data"),
     prevent_initial_call=True,
 )
 def load_30(stop):
     if not stop:
-        return no_update, no_update, no_update, no_update
-    stops_30 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=30)
+        return no_update, no_update, no_update, no_update, no_update
+    try:
+        stops_30 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=30)
+    except requests.exceptions.HTTPError:
+        return no_update, None, "", _HIDE, True
     origin = {**stop, "duration": 0, "origin": True}
-    return [origin, *stops_30], stop, "Loading 60 min radius...", _SHOW
+    return [origin, *stops_30], stop, "Loading 60 min radius...", _SHOW, None
 
 
 @callback(
     Output("stations-store", "data", allow_duplicate=True),
     Output("loading-text", "children", allow_duplicate=True),
     Output("spinner", "style", allow_duplicate=True),
+    Output("api-error", "data", allow_duplicate=True),
     Input("pending-60", "data"),
     prevent_initial_call=True,
 )
 def load_60(stop):
     if not stop:
-        return no_update, no_update, no_update
-    stops_60 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=_MAX_DURATION)
+        return no_update, no_update, no_update, no_update
+    try:
+        stops_60 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=_MAX_DURATION)
+    except requests.exceptions.HTTPError:
+        return no_update, "", _HIDE, True
     cache.set(stop["id"], stops_60)
     origin = {**stop, "duration": 0, "origin": True}
-    return [origin, *stops_60], "", _HIDE
+    return [origin, *stops_60], "", _HIDE, None
 
 
 @callback(
@@ -164,7 +194,7 @@ def plot_stations(stops):
             color, radius = "rgb(30,100,255)", 10
         else:
             t = s["duration"] / _MAX_DURATION
-            r, g, b, _ = cm.RdYlGn(1 - t)
+            r, g, b, _ = cm.viridis(1 - t)
             color, radius = f"rgb({int(r*255)},{int(g*255)},{int(b*255)})", 6
         markers.append(
             dl.CircleMarker(
