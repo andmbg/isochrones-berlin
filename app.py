@@ -139,7 +139,7 @@ app.layout = dmc.MantineProvider(
                 "zIndex": 1000,
                 "pointerEvents": "none",
 
-                "boxShadow": "5px 5px 30px rgb(70,120,200)"
+                "boxShadow": "10px 10px 80px rgba(0,0,0, .6)"
             },
         ),
         dcc.Store(id="stations-store"),
