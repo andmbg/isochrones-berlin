@@ -124,6 +124,24 @@ app.layout = dmc.MantineProvider(
                 "border": "2px solid #88888888"
             },
         ),
+        # Hint overlay — hidden after first click
+        dmc.Paper(
+            dmc.Text("Auf den Startort klicken", size="sm", fw=500),
+            id="hint-overlay",
+            shadow="sm",
+            radius="md",
+            p="sm",
+            style={
+                "position": "fixed",
+                "top": "30%",
+                "left": "50%",
+                "transform": "translateX(-50%)",
+                "zIndex": 1000,
+                "pointerEvents": "none",
+
+                "boxShadow": "5px 5px 30px rgb(70,120,200)"
+            },
+        ),
         dcc.Store(id="stations-store"),
         dcc.Store(id="pending-30"),
         dcc.Store(id="pending-60"),
@@ -158,25 +176,26 @@ def show_error_modal(error):
     Output("loading-text", "children"),
     Output("spinner", "style"),
     Output("api-error", "data"),
+    Output("hint-overlay", "style"),
     Input("map", "clickData"),
 )
 def on_map_click(click_data):
     if not click_data:
-        return None, None, "", _HIDE, None
+        return None, None, "", _HIDE, None, no_update
     lat = click_data["latlng"]["lat"]
     lng = click_data["latlng"]["lng"]
     try:
         stop = nearest_stop(lat, lng)
     except requests.exceptions.HTTPError:
-        return no_update, no_update, "", _HIDE, True
+        return no_update, no_update, "", _HIDE, True, _HIDE
     origin = {**stop, "duration": 0, "origin": True}
 
     cached = cache.get(stop["id"])
     if cached is not None:
-        return [origin, *cached], None, "", _HIDE, None
+        return [origin, *cached], None, "", _HIDE, None, _HIDE
 
     stops_15 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=15)
-    return [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW, None
+    return [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW, None, _HIDE
 
 
 @callback(
