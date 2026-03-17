@@ -5,3 +5,9 @@ html, body, #_dash-app-content {
   height: 100%;
   overflow: hidden;
 }
+
+/* Switch track colour when unchecked (light mode) */
+.mantine-Switch-track:not([data-checked]) {
+  background-color: #808080;
+  border-color: #808080;
+}

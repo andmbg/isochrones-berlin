@@ -18,6 +18,51 @@ _ATTRIBUTION = (
     ' &copy; <a href="https://carto.com/attributions">CARTO</a>'
 )
 
+def _legend():
+    """
+    Four adjacent rectangles representing the three isochrone bands plus the
+    uncovered area (> 45 min).  Labels 15 / 30 / 45 sit above the shared edges.
+    """
+    rect_w, rect_h = 42, 14   # pixels
+
+    # (border colour, fill colour) matching the bands in src/plotting.py
+    bands = [
+        ("#1a9641", "rgba(26,150,65,0.25)"),
+        ("#d0c721", "rgba(208,199,33,0.25)"),
+        ("#fdc461", "rgba(253,196,97,0.25)"),
+    ]
+
+    def rect(border, fill, left_border=True):
+        return html.Div(style={
+            "width": rect_w, "height": rect_h, "boxSizing": "border-box",
+            "background": fill,
+            "borderTop":    f"1.5px solid {border}",
+            "borderRight":  f"1.5px solid {border}",
+            "borderBottom": f"1.5px solid {border}",
+            "borderLeft":   f"1.5px solid {border}" if left_border else "none",
+        })
+
+    rects = [rect(b, f, left_border=(i == 0)) for i, (b, f) in enumerate(bands)]
+    # rects.append(rect("#808080", "rgba(128,128,128,0.25)", left_border=False))
+
+    labels = [
+        html.Span(str(minutes) + "'", style={
+            "position": "absolute",
+            "top": "-13px",
+            "left": f"{(i + 1) * rect_w}px",
+            "transform": "translateX(-50%)",
+            "fontSize": "10px",
+            "lineHeight": "1",
+        })
+        for i, minutes in enumerate([15, 30, 45])
+    ]
+
+    return html.Div(
+        style={"position": "relative", "marginTop": "10px"},
+        children=[*labels, html.Div(style={"display": "flex"}, children=rects)],
+    )
+
+
 app.layout = dmc.MantineProvider(
     id="mantine-provider",
     children=[
@@ -41,21 +86,15 @@ app.layout = dmc.MantineProvider(
         dmc.Paper(
             dmc.Stack(
                 [
-                    dmc.Group(
-                        [
-                            dmc.Title("Isochrones Dashboard", order=4),
-                            dmc.Switch(
-                                id="color-scheme-toggle",
-                                label="Dark mode",
-                                size="sm",
-                                checked=False,
-                            ),
-                        ],
-                        justify="space-between",
-                        align="center",
+                    dmc.Title("Isochrones Dashboard", order=4),
+                    _legend(),
+                    dmc.Switch(
+                        id="color-scheme-toggle",
+                        onLabel="🌙",
+                        offLabel="☀️",
+                        size="md",
+                        checked=False,
                     ),
-                    dmc.Text(id="click-coords", c="dimmed", size="xs"),
-                    dmc.Text(id="click-address", c="dimmed", size="xs"),
                     dmc.Group(
                         [
                             html.Div(
@@ -63,13 +102,14 @@ app.layout = dmc.MantineProvider(
                                 className="spinner",
                                 style={"display": "none"},
                             ),
-                            dmc.Text(id="loading-text", size="xs", c="blue"),
+                            dmc.Text(id="loading-text", size="xs", c="blue", mih=20),
                         ],
                         gap="xs",
                         align="center",
                     ),
                 ],
                 gap="xs",
+                align="center",
             ),
             shadow="md",
             radius="md",
@@ -79,7 +119,9 @@ app.layout = dmc.MantineProvider(
                 "top": 10,
                 "left": 50,
                 "zIndex": 1000,
-                "minWidth": 300,
+                # "minWidth": 300,
+                "background-color": "#88888828",
+                "border": "2px solid #88888888"
             },
         ),
         dcc.Store(id="stations-store"),
@@ -111,8 +153,6 @@ def show_error_modal(error):
 
 
 @callback(
-    Output("click-coords", "children"),
-    Output("click-address", "children"),
     Output("stations-store", "data"),
     Output("pending-30", "data"),
     Output("loading-text", "children"),
@@ -122,22 +162,21 @@ def show_error_modal(error):
 )
 def on_map_click(click_data):
     if not click_data:
-        return "Klicke auf die Karte, um Koordinaten zu sehen.", "", None, None, "", _HIDE, None
+        return None, None, "", _HIDE, None
     lat = click_data["latlng"]["lat"]
     lng = click_data["latlng"]["lng"]
     try:
         stop = nearest_stop(lat, lng)
     except requests.exceptions.HTTPError:
-        return no_update, no_update, no_update, no_update, "", _HIDE, True
-    coords = f"Lat: {stop['lat']:.5f}  |  Lng: {stop['lng']:.5f}"
+        return no_update, no_update, "", _HIDE, True
     origin = {**stop, "duration": 0, "origin": True}
 
     cached = cache.get(stop["id"])
     if cached is not None:
-        return coords, stop["name"], [origin, *cached], None, "", _HIDE, None
+        return [origin, *cached], None, "", _HIDE, None
 
     stops_15 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=15)
-    return coords, stop["name"], [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW, None
+    return [origin, *stops_15], stop, "Loading 30 min radius...", _SHOW, None
 
 
 @callback(
