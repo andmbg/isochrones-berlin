@@ -9,7 +9,7 @@ import requests
 from src.bvg import fetch_reachable_stops, nearest_stop
 from src import cache
 
-app = Dash(__name__, requests_pathname_prefix=os.getenv("DASH_URL_PREFIX", "/"))
+app = Dash(__name__, url_base_pathname=os.getenv("DASH_URL_PREFIX", "/"))
 
 _TILE_LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
 _TILE_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
