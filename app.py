@@ -102,7 +102,7 @@ app.layout = dmc.MantineProvider(
                                 className="spinner",
                                 style={"display": "none"},
                             ),
-                            dmc.Text(id="loading-text", size="xs", c="blue", mih=20),
+                            dmc.Text(id="loading-text", size="xs", c="blue", mih=14),
                         ],
                         gap="xs",
                         align="center",
