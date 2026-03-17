@@ -3,11 +3,11 @@ import os
 import dash_leaflet as dl
 from dash import Dash, Input, Output, callback, dcc, html, no_update
 import dash_mantine_components as dmc
-import matplotlib.cm as cm
 import requests
 
 from src.bvg import fetch_reachable_stops, nearest_stop
 from src import cache
+from src.plotting import make_layers, MAX_DURATION
 
 app = Dash(__name__, url_base_pathname=os.getenv("DASH_URL_PREFIX", "/"))
 
@@ -17,7 +17,6 @@ _ATTRIBUTION = (
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     ' &copy; <a href="https://carto.com/attributions">CARTO</a>'
 )
-_MAX_DURATION = 60  # colour scale fixed to this value
 
 app.layout = dmc.MantineProvider(
     id="mantine-provider",
@@ -173,7 +172,7 @@ def load_60(stop):
     if not stop:
         return no_update, no_update, no_update, no_update
     try:
-        stops_60 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=_MAX_DURATION)
+        stops_60 = fetch_reachable_stops(stop["lat"], stop["lng"], stop["name"], max_duration=MAX_DURATION)
     except requests.exceptions.HTTPError:
         return no_update, "", _HIDE, True
     cache.set(stop["id"], stops_60)
@@ -186,28 +185,7 @@ def load_60(stop):
     Input("stations-store", "data"),
 )
 def plot_stations(stops):
-    if not stops:
-        return []
-    markers = []
-    for s in stops:
-        if s.get("origin"):
-            color, radius = "rgb(30,100,255)", 10
-        else:
-            t = s["duration"] / _MAX_DURATION
-            r, g, b, _ = cm.viridis(1 - t)
-            color, radius = f"rgb({int(r*255)},{int(g*255)},{int(b*255)})", 6
-        markers.append(
-            dl.CircleMarker(
-                center=[s["lat"], s["lng"]],
-                radius=radius,
-                color="rgb(128,128,128)",
-                fillColor=color,
-                fillOpacity=0.8,
-                weight=1,
-                children=dl.Tooltip(f"{s['name']} ({s['duration']} min)"),
-            )
-        )
-    return markers
+    return make_layers(stops)
 
 
 @callback(

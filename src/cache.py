@@ -3,7 +3,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 
-_DB_PATH = os.getenv("CACHE_DB", "/app/data/cache.db")
+_DB_PATH = os.getenv("CACHE_DB", "data/cache.db")
 
 
 @contextmanager
